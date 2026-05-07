@@ -30,6 +30,7 @@ typedef struct thread_s {
     pthread_mutex_t pot_mutex;
     sem_t call_druid;
     sem_t pot_refilled;
+    size_t nb_waiting;
 } thread_t;
 
 typedef struct arg_vilager_s {

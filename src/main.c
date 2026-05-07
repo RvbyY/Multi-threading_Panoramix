@@ -37,14 +37,18 @@ bool parse_values(unsigned int *nb_villagers, unsigned int *pot_size,
     return true;
 }
 
-void *druid_thread(arg_druid_t *arg)
+void *druid_thread(void *args)
 {
+    arg_druid_t *arg = (arg_druid_t *)arg;
+
     while (arg->druid->nb_refills > 0) {
         sem_wait(&arg->thread_manager->call_druid);
         pthread_mutex_lock(&arg->thread_manager->pot_mutex);
         refill_pot(arg->druid);
         pthread_mutex_unlock(&arg->thread_manager->pot_mutex);
-        sem_post(&arg->thread_manager->pot_refilled);
+        for (size_t i = 0; i < arg->thread_manager->nb_waiting; i++)
+            sem_post(&arg->thread_manager->pot_refilled);
+        arg->thread_manager->nb_waiting = 0;
     }
     clear_druid(arg->druid);
     pthread_exit(EXIT_SUCCESS);
@@ -56,9 +60,11 @@ void *villager_thread(arg_vilager_t *args)
 
     while (villager->nb_fights > 0) {
         pthread_mutex_lock(&args->thread_manager->pot_mutex);
-        if (args->druid->pot == 0 && args->druid->is_called == false) {
-            args->druid->is_called = true;
-            sem_post(&args->thread_manager->call_druid);
+        if (args->druid->pot == 0) {
+            if (args->druid->is_called == false) {
+                args->druid->is_called = true;
+                sem_post(&args->thread_manager->call_druid);
+            }
             pthread_mutex_unlock(&args->thread_manager->pot_mutex);
             sem_wait(&args->thread_manager->pot_refilled);
             pthread_mutex_lock(&args->thread_manager->pot_mutex);
@@ -73,7 +79,7 @@ void *villager_thread(arg_vilager_t *args)
 
 bool run_game(unsigned int nb_villagers, unsigned int pot_size,
     unsigned int nb_fights, unsigned int nb_refills)
-    {
+{
     sem_t semaphore;
     pthread_t threads[nb_villagers + 1];
     thread_t *thread_manager = malloc(sizeof(thread_t));
@@ -82,12 +88,19 @@ bool run_game(unsigned int nb_villagers, unsigned int pot_size,
 
     sem_init(&semaphore, PTHREAD_PROCESS_SHARED, 1);
     pthread_create(&threads[0], NULL, druid_thread, &arg);
-    for (size_t i = 1; i < nb_villagers; i++) {
-        arg_vilager_t args = {nb_villagers - i, nb_fights, druid, thread_manager};
+    for (size_t i = 1; i <= nb_villagers; i++) {
+        arg_vilager_t *args = malloc(sizeof(arg_vilager_t));
+        args->id = nb_villagers - i + 1;
+        args->nb_fights = nb_fights;
+        args->druid = druid;
+        args->thread_manager = thread_manager;
+        pthread_mutex_init(&thread_manager->pot_mutex, NULL);
+        sem_init(&thread_manager->call_druid, 0, 0);
+        sem_init(&thread_manager->pot_refilled, 0, 0);
         pthread_create(&threads[i], NULL,
                 villager_thread, &args);
     }
-    for (size_t i = 0; i < nb_villagers; i++)
+    for (size_t i = 0; i <= nb_villagers; i++)
         pthread_join(threads[i], NULL);
     sem_destroy(&semaphore);
     return true;

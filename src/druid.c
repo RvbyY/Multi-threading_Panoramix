@@ -35,7 +35,8 @@ size_t refill_pot(druid_t *druid)
 {
     if (!druid->nb_refills || druid->pot)
         return druid->pot;
+    druid->pot = druid->pot_size;
     druid->nb_refills--;
     printf("Druid: Ah! Yes, yes, I'm awake! Working on it! Beware I can only make %d more refills after this one.\n", druid->nb_refills);
-    return druid->pot_size;
+    return druid->pot;
 }
