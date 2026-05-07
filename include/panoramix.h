@@ -7,6 +7,8 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <semaphore.h>
+#include <pthread.h>
 
 #ifndef INCLUDED_PANORAMIX_H
     #define INCLUDED_PANORAMIX_H
@@ -23,6 +25,26 @@ typedef struct druid_s {
     size_t pot_size;
     size_t nb_refills;
 } druid_t;
+
+typedef struct thread_s {
+    pthread_mutex_t pot_mutex;
+    sem_t call_druid;
+    sem_t pot_refilled;
+} thread_t;
+
+typedef struct arg_vilager_s {
+    unsigned int id;
+    unsigned int nb_fights;
+    druid_t *druid;
+    thread_t *thread_manager;
+} arg_vilager_t;
+
+typedef struct arg_druid_s {
+    unsigned int pot_size;
+    unsigned int nb_refills;
+    thread_t *thread_manager;
+    druid_t *druid;
+} arg_druid_t;
 
 void clear_druid(druid_t *druid);
 void clear_villager(villager_t *villager);

@@ -7,8 +7,6 @@
 
 #include "panoramix.h"
 #include <unistd.h>
-#include <semaphore.h>
-#include <pthread.h>
 #include <stdlib.h>
 
 void helper(void)
@@ -31,21 +29,72 @@ bool parse_values(unsigned int *nb_villagers, unsigned int *pot_size,
     for (size_t i = 2; argv[i] != NULL; i++)
         if (atoi(argv[i]) <= 0)
             return false;
-    unsigned int **value_array = malloc(sizeof(int) * 4);
-    for (size_t i = 2; argv[i] != NULL; i++, j++)
-        value_array[j] = atoi(argv[i]);
-    nb_villagers = value_array[0];
-    pot_size = value_array[1];
-    nb_fights = value_array[2];
-    nb_refills = value_array[3];
+    *nb_villagers = (unsigned int)atoi(argv[1]);
+    *pot_size = (unsigned int)atoi(argv[2]);
+    *nb_fights = (unsigned int)atoi(argv[3]);
+    *nb_refills = (unsigned int)atoi(argv[4]);
     free_array(argv);
-    free_array(value_array);
+    return true;
+}
+
+void *druid_thread(arg_druid_t *arg)
+{
+    while (arg->druid->nb_refills > 0) {
+        sem_wait(&arg->thread_manager->call_druid);
+        pthread_mutex_lock(&arg->thread_manager->pot_mutex);
+        refill_pot(arg->druid);
+        pthread_mutex_unlock(&arg->thread_manager->pot_mutex);
+        sem_post(&arg->thread_manager->pot_refilled);
+    }
+    clear_druid(arg->druid);
+    pthread_exit(EXIT_SUCCESS);
+}
+
+void *villager_thread(arg_vilager_t *args)
+{
+    villager_t *villager = build_a_new_villager(args->nb_fights, args->id);
+
+    while (villager->nb_fights > 0) {
+        pthread_mutex_lock(&args->thread_manager->pot_mutex);
+        if (args->druid->pot == 0 && args->druid->is_called == false) {
+            args->druid->is_called = true;
+            sem_post(&args->thread_manager->call_druid);
+            pthread_mutex_unlock(&args->thread_manager->pot_mutex);
+            sem_wait(&args->thread_manager->pot_refilled);
+            pthread_mutex_lock(&args->thread_manager->pot_mutex);
+        }
+        try_to_drink(villager, args->druid);
+        pthread_mutex_unlock(&args->thread_manager->pot_mutex);
+        villager_fight(villager);
+    }
+    clear_villager(villager);
+    pthread_exit(EXIT_SUCCESS);
+}
+
+bool run_game(unsigned int nb_villagers, unsigned int pot_size,
+    unsigned int nb_fights, unsigned int nb_refills)
+    {
+    sem_t semaphore;
+    pthread_t threads[nb_villagers + 1];
+    thread_t *thread_manager = malloc(sizeof(thread_t));
+    druid_t *druid = build_a_new_druid(pot_size, nb_refills);
+    arg_druid_t arg = {pot_size, nb_refills, thread_manager, druid};
+
+    sem_init(&semaphore, PTHREAD_PROCESS_SHARED, 1);
+    pthread_create(&threads[0], NULL, druid_thread, &arg);
+    for (size_t i = 1; i < nb_villagers; i++) {
+        arg_vilager_t args = {nb_villagers - i, nb_fights, druid, thread_manager};
+        pthread_create(&threads[i], NULL,
+                villager_thread, &args);
+    }
+    for (size_t i = 0; i < nb_villagers; i++)
+        pthread_join(threads[i], NULL);
+    sem_destroy(&semaphore);
     return true;
 }
 
 int main(int argc, char **argv)
 {
-    sem_t semaphore;
     unsigned int nb_villagers = 0;
     unsigned int pot_size = 0;
     unsigned int nb_fights = 0;
@@ -59,7 +108,10 @@ int main(int argc, char **argv)
         free_array(argv);
         return 84;
     }
-    pthread_t threads[nb_villagers + 1];
-    sem_init(&semaphore, PTHREAD_PROCESS_SHARED, 1);
+    if (run_game(nb_villagers, pot_size, nb_fights, nb_refills) == false) {
+        free(argv);
+        return 84;
+    }
+    free(argv);
     return 0;
 }

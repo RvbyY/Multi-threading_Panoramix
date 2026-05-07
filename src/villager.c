@@ -39,6 +39,7 @@ bool try_to_drink(villager_t *villager, druid_t *druid)
     villager->have_drink = true;
     printf("Villager %d: I need a drink... I see %d servings left.\n", villager->id, druid->pot);
     druid->pot--;
+    druid->is_called = false;
     return villager->have_drink;
 }
 
