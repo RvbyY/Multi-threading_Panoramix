@@ -9,6 +9,8 @@
 #include <stdbool.h>
 #include <semaphore.h>
 #include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifndef INCLUDED_PANORAMIX_H
     #define INCLUDED_PANORAMIX_H
@@ -31,6 +33,8 @@ typedef struct thread_s {
     sem_t call_druid;
     sem_t pot_refilled;
     size_t nb_waiting;
+    sem_t druid_can_exit;
+    size_t active_villagers;
 } thread_t;
 
 typedef struct arg_vilager_s {
@@ -53,7 +57,8 @@ void helper(void);
 druid_t *build_a_new_druid(size_t pot_size, size_t nb_refill);
 size_t refill_pot(druid_t *druid);
 villager_t *build_a_new_villager(size_t nb_fights, size_t id);
-bool try_to_drink(villager_t *villager, druid_t *druid);
+bool try_to_drink(villager_t *villager, druid_t *druid, thread_t *thread_manager);
 size_t villager_fight(villager_t *villager);
+void call_druid(druid_t *druid, thread_t *thread_manager);
 
 #endif
