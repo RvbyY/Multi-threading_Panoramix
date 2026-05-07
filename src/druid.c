@@ -15,6 +15,27 @@ void clear_druid(druid_t *druid)
     write(1, "Druid: I'm out of viscum. I'm going back to... zZz\n", 52);
 }
 
+void *druid_thread(void *args)
+{
+    arg_druid_t *arg = (arg_druid_t *)args;
+    size_t to_wake = 0;
+
+    while (arg->druid->nb_refills > 0) {
+        sem_wait(&arg->thread_manager->call_druid);
+        pthread_mutex_lock(&arg->thread_manager->pot_mutex);
+        refill_pot(arg->druid);
+        to_wake = arg->thread_manager->nb_waiting;
+        pthread_mutex_unlock(&arg->thread_manager->pot_mutex);
+        for (size_t i = 0; i < to_wake; i++)
+            sem_post(&arg->thread_manager->pot_refilled);
+        arg->thread_manager->nb_waiting = 0;
+    }
+    sem_wait(&arg->thread_manager->druid_can_exit);
+    clear_druid(arg->druid);
+    free(arg);
+    pthread_exit(EXIT_SUCCESS);
+}
+
 druid_t *build_a_new_druid(size_t pot_size, size_t nb_refill)
 {
     druid_t *druid = malloc(sizeof(druid_t));

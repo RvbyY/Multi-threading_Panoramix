@@ -28,6 +28,27 @@ villager_t *build_a_new_villager(size_t nb_fights, size_t id)
     return villager;
 }
 
+void *villager_thread(void *arg)
+{
+    arg_vilager_t *args = (arg_vilager_t *)arg;
+    villager_t *villager = build_a_new_villager(args->nb_fights, args->id);
+
+    while (villager->nb_fights > 0) {
+        pthread_mutex_lock(&args->thread_manager->pot_mutex);
+        try_to_drink(villager, args->druid, args->thread_manager);
+        pthread_mutex_unlock(&args->thread_manager->pot_mutex);
+        villager_fight(villager);
+    }
+    pthread_mutex_lock(&args->thread_manager->pot_mutex);
+    args->thread_manager->active_villagers--;
+    if (args->thread_manager->active_villagers == 0)
+        sem_post(&args->thread_manager->druid_can_exit);
+    pthread_mutex_unlock(&args->thread_manager->pot_mutex);
+    clear_villager(villager);
+    free(args);
+    pthread_exit(EXIT_SUCCESS);
+}
+
 bool try_to_drink(villager_t *villager, druid_t *druid, thread_t *thread_manager)
 {
     printf("Villager %ld: I need a drink... I see %ld servings left.\n", villager->id, druid->pot);
