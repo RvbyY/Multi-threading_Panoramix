@@ -60,5 +60,11 @@ villager_t *build_a_new_villager(size_t nb_fights, size_t id);
 bool try_to_drink(villager_t *villager, druid_t *druid, thread_t *thread_manager);
 size_t villager_fight(villager_t *villager);
 void call_druid(druid_t *druid, thread_t *thread_manager);
+bool parse_values(unsigned int *nb_villagers, unsigned int *pot_size,
+    unsigned int *nb_fights, unsigned int *nb_refills, char **argv);
+void *druid_thread(void *args);
+void *villager_thread(void *arg);
+bool run_game(unsigned int nb_villagers, unsigned int pot_size,
+    unsigned int nb_fights, unsigned int nb_refills);
 
 #endif

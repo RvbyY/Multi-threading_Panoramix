@@ -24,6 +24,9 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -Werror -I./include -g
 SRCS = 	src/main.c \
 		src/villager.c \
 		src/druid.c \
+		src/call_druid.c \
+		src/parse_values.c \
+		src/run_game.c \
 
 OBJS = $(SRCS:.cpp=.o)
 
